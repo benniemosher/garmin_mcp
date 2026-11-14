@@ -632,7 +632,9 @@ curl -i -H "Authorization: Bearer $GARMIN_MCP_HTTP_TOKEN" http://localhost:8000/
 
 Most MCP clients accept custom headers for remote servers (Claude Desktop and
 claude.ai connectors, the MCP Inspector, and the SDK clients all do); put the
-same `Authorization: Bearer …` header there. The comparison is constant-time.
+same `Authorization: Bearer …` header there. claude.ai custom connectors reserve
+`Authorization`, so there send the bare token as `X-API-Key: <token>` instead.
+The comparison is constant-time.
 `/healthz` and `/readyz` never require the token, since they only report that
 the process is up and whether the Garmin login finished.
 

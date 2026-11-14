@@ -43,6 +43,8 @@ def test_streamable_http_requires_the_token(http_env):
         wrong_token = client.post("/mcp", json={}, headers={"Authorization": f"Bearer {TOKEN}x"})
         wrong_scheme = client.post("/mcp", json={}, headers={"Authorization": f"Basic {TOKEN}"})
         with_token = client.post("/mcp", json={}, headers={"Authorization": f"Bearer {TOKEN}"})
+        api_key = client.post("/mcp", json={}, headers={"X-API-Key": TOKEN})
+        wrong_api_key = client.post("/mcp", json={}, headers={"X-API-Key": f"{TOKEN}x"})
         probe = client.get("/healthz")
         ready = client.get("/readyz")
 
@@ -51,6 +53,8 @@ def test_streamable_http_requires_the_token(http_env):
     assert anonymous.json()["error"] == "unauthorized"
     assert wrong_token.status_code == 401
     assert wrong_scheme.status_code == 401
+    assert wrong_api_key.status_code == 401
+    assert api_key.status_code != 401
     # The handshake itself rejects an empty body, but auth let it through.
     assert with_token.status_code != 401
     assert probe.status_code == 200 and probe.text == "ok"

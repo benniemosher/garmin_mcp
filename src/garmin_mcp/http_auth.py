@@ -2,7 +2,7 @@
 
 GARMIN_MCP_TRANSPORT=streamable-http|sse serves full read/write access to the
 Garmin account. With GARMIN_MCP_HTTP_TOKEN set, every request must carry
-``Authorization: Bearer <token>``; the liveness and readiness probes stay open
+``Authorization: Bearer <token>`` or ``X-API-Key: <token>``; the liveness and readiness probes stay open
 because they reveal nothing beyond "up" and "logged in".
 
 FastMCP builds its Starlette app inside streamable_http_app() / sse_app() and
@@ -47,12 +47,19 @@ class BearerTokenGate:
 
     def authorized(self, scope) -> bool:
         for name, value in scope.get("headers") or ():
-            if name.lower() != b"authorization":
-                continue
-            scheme, _, credential = value.strip().partition(b" ")
-            return scheme.lower() == b"bearer" and hmac.compare_digest(
-                credential.strip(), self._token
-            )
+            name = name.lower()
+            if name == b"authorization":
+                scheme, _, credential = value.strip().partition(b" ")
+                if scheme.lower() == b"bearer" and hmac.compare_digest(
+                    credential.strip(), self._token
+                ):
+                    return True
+            # claude.ai custom connectors reserve the Authorization header, so
+            # the same token is also accepted bare in X-API-Key.
+            elif name == b"x-api-key" and hmac.compare_digest(
+                value.strip(), self._token
+            ):
+                return True
         return False
 
     async def __call__(self, scope, receive, send):
@@ -64,7 +71,10 @@ class BearerTokenGate:
             response = JSONResponse(
                 {
                     "error": "unauthorized",
-                    "detail": "Send 'Authorization: Bearer <GARMIN_MCP_HTTP_TOKEN>'.",
+                    "detail": (
+                        "Send 'Authorization: Bearer <GARMIN_MCP_HTTP_TOKEN>' "
+                        "or 'X-API-Key: <GARMIN_MCP_HTTP_TOKEN>'."
+                    ),
                 },
                 status_code=401,
                 headers={"WWW-Authenticate": 'Bearer realm="garmin-mcp"'},
